@@ -5,6 +5,7 @@ C++ implementation of staple algorithm for object tracking.
 I wrote this code only for praticing OpenCV and Matlab, still many things need to be optimized.
 
 Some code from:
+
 https://github.com/foolwood/DAT
 
 https://github.com/ppaanngggg/fhog
