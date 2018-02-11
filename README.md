@@ -6,6 +6,7 @@ I wrote this code only for praticing OpenCV and Matlab, still many things need t
 
 Some code from:
 https://github.com/foolwood/DAT
+
 https://github.com/ppaanngggg/fhog
 
 Original matlab version:
