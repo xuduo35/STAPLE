@@ -485,7 +485,7 @@ void STAPLE_TRACKER::getFeatureMap(cv::Mat &im_patch, const char *feature_type, 
 
         mexResize(im_patch, new_im_patch, newsz, "auto");
     } else {
-        new_im_patch = im_patch.clone();
+        new_im_patch = im_patch;
     }
 
     cv::Mat grayimg;
@@ -493,7 +493,7 @@ void STAPLE_TRACKER::getFeatureMap(cv::Mat &im_patch, const char *feature_type, 
     if (new_im_patch.channels() > 1) {
         cv::cvtColor(new_im_patch, grayimg, CV_BGR2GRAY);
     } else {
-        grayimg = new_im_patch.clone();
+        grayimg = new_im_patch;
     }
 
     // out(:,:,1) = single(im_patch)/255 - 0.5;
@@ -541,7 +541,7 @@ void matsplit(const cv::MatND &xt, std::vector<cv::Mat> &xtsplit)
             }
 
         cv::Mat dim(h, w, CV_32FC2, XT);
-        xtsplit.push_back(dim.clone());
+        xtsplit.push_back(dim);
     }
 }
 
@@ -569,7 +569,7 @@ void STAPLE_TRACKER::tracker_staple_train(cv::Mat &im, bool first)
     for (int i =  0; i < xt.channels(); i++) {
         cv::Mat dimf;
         cv::dft(xtsplit[i], dimf);
-        xtf.push_back(dimf.clone());
+        xtf.push_back(dimf);
     }
 
     // FILTER UPDATE
@@ -600,7 +600,7 @@ void STAPLE_TRACKER::tracker_staple_train(cv::Mat &im, bool first)
 
         cv::Mat dim(h, w, CV_32FC2, DIM);
 
-        new_hf_num.push_back(dim.clone());
+        new_hf_num.push_back(dim);
     }
 
     for (int ch = 0; ch < xt.channels(); ch++) {
@@ -615,7 +615,7 @@ void STAPLE_TRACKER::tracker_staple_train(cv::Mat &im, bool first)
 
         cv::Mat dim(h, w, CV_32FC1, DIM1);
 
-        new_hf_den.push_back(dim.clone());
+        new_hf_den.push_back(dim);
     }
 
     if (first) {
@@ -865,7 +865,7 @@ cv::Rect STAPLE_TRACKER::tracker_staple_update(cv::Mat &im)
     for (int i =  0; i < xt_windowed.channels(); i++) {
         cv::Mat dimf;
         cv::dft(xtsplit[i], dimf);
-        xtf.push_back(dimf.clone());
+        xtf.push_back(dimf);
     }
 
     std::vector<cv::Mat> hf;
@@ -889,7 +889,7 @@ cv::Rect STAPLE_TRACKER::tracker_staple_update(cv::Mat &im)
 
             cv::Mat dim(h, w, CV_32FC2, DIM);
 
-            hf.push_back(dim.clone());
+            hf.push_back(dim);
         }
     } else {
         //hf = bsxfun(@rdivide, hf_num, sum(hf_den, 3)+p.lambda);
@@ -920,7 +920,7 @@ cv::Rect STAPLE_TRACKER::tracker_staple_update(cv::Mat &im)
 
             cv::Mat dim(h, w, CV_32FC2, DIM);
 
-            hf.push_back(dim.clone());
+            hf.push_back(dim);
         }
 
         delete[] DIM1;

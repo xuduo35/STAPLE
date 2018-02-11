@@ -7,7 +7,7 @@ IF (WIN32)
   set(OpenCV_DIR D:/opencv310/build)
 ENDIF(WIN32)
 IF (UNIX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g") #c++11
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3") #c++11
 ENDIF (UNIX)
 find_package(OpenCV REQUIRED)
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
