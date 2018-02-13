@@ -35,11 +35,11 @@ struct staple_cfg
     bool scale_adaptation = true;
     int hog_scale_cell_size = 4;         // Default DSST=4
     double learning_rate_scale = 0.025;
-    double scale_sigma_factor = 1/4;
+    double scale_sigma_factor = 1/4.0;
     int num_scales = 33;
     double scale_model_factor = 1.0;
     double scale_step = 1.02;
-    int scale_model_max_area = 32*16;
+    double scale_model_max_area = 32*16;
 
     // debugging stuff
     int visualization = 0;              // show output bbox on frame
@@ -65,6 +65,7 @@ protected:
     void initializeAllAreas(cv::Mat &im);
 
     void getSubwindow(const cv::Mat &im, cv::Point_<float> centerCoor, cv::Size model_sz, cv::Size scaled_sz, cv::Mat &output);
+    void getSubwindowFloor(const cv::Mat &im, cv::Point_<float> centerCoor, cv::Size model_sz, cv::Size scaled_sz, cv::Mat &output);
     void updateHistModel(bool new_model, cv::Mat &patch, double learning_rate_pwp=0.0);
     void CalculateHann(cv::Size sz, cv::Mat &output);
     void gaussianResponse(cv::Size rect_size, double sigma, cv::Mat &output);
@@ -73,6 +74,7 @@ protected:
     void getColourMap(const cv::Mat &patch, cv::Mat& output);
     void getCenterLikelihood(const cv::Mat &object_likelihood, cv::Size m, cv::Mat& center_likelihood);
     void mergeResponses(const cv::Mat &response_cf, const cv::Mat &response_pwp, cv::Mat &response);
+    void getScaleSubwindow(const cv::Mat &im, cv::Point_<float> centerCoor, cv::Mat &output);
 
 private:
     staple_cfg cfg;
@@ -102,6 +104,18 @@ private:
     std::vector<cv::Mat> hf_num;
 
     cv::Rect rect_position;
+
+    float scale_factor;
+    cv::Mat scale_window;
+    cv::Mat scale_factors;
+    cv::Size scale_model_sz;
+    float min_scale_factor;
+    float max_scale_factor;
+    cv::Size base_target_sz;
+
+    cv::Mat ysf;
+    cv::Mat sf_den;
+    cv::Mat sf_num;
 };
 
 #endif

@@ -140,8 +140,8 @@ void STAPLE_TRACKER::getSubwindow(const cv::Mat &im, cv::Point_<float> centerCoo
         );
 
     cv::Point rightbottom(
-        std::max(0, int(centerCoor.x + sz.width - sz.width/2.0 + 0.5)),
-        std::max(0, int(centerCoor.y + sz.height - sz.height/2.0 + 0.5))
+        std::max(0, int(lefttop.x + sz.width - 1)),
+        std::max(0, int(lefttop.y + sz.height - 1))
         );
 
     cv::Point lefttopLimit(
@@ -426,36 +426,80 @@ void STAPLE_TRACKER::tracker_staple_initialize(cv::Mat &im, cv::Rect_<float> reg
     cv::Mat y;
     gaussianResponse(cf_response_size, output_sigma, y);
     cv::dft(y, yf);
-#if 0
-    %% SCALE ADAPTATION INITIALIZATION
-    if p.scale_adaptation
-        % Code from DSST
+
+    // SCALE ADAPTATION INITIALIZATION
+    if (cfg.scale_adaptation) {
+        // Code from DSST
         scale_factor = 1;
-        base_target_sz = target_sz;
-        scale_sigma = sqrt(p.num_scales) * p.scale_sigma_factor;
-        ss = (1:p.num_scales) - ceil(p.num_scales/2);
-        ys = exp(-0.5 * (ss.^2) / scale_sigma^2);
-        ysf = single(fft(ys));
-        if mod(p.num_scales,2) == 0
-            scale_window = single(hann(p.num_scales+1));
-            scale_window = scale_window(2:end);
-        else
-            scale_window = single(hann(p.num_scales));
-        end;
+        base_target_sz = target_sz; // xxx
+        float scale_sigma = sqrt(cfg.num_scales) * cfg.scale_sigma_factor;
+        float *ss = new float[cfg.num_scales*2];
+        float *ysbuf = ss;
 
-        ss = 1:p.num_scales;
-        scale_factors = p.scale_step.^(ceil(p.num_scales/2) - ss);
+        for (int i = 0; i < cfg.num_scales; i++) {
+            ss[i*2] = (i+1) - ceil(cfg.num_scales/2.0);
+            ysbuf[i*2] = exp(-0.5 * (ss[i*2]*ss[i*2]) / (scale_sigma*scale_sigma));
+            ysbuf[i*2+1] = 0.0;
+            // ss = (1:p.num_scales) - ceil(p.num_scales/2);
+            // ys = exp(-0.5 * (ss.^2) / scale_sigma^2);
+        }
 
-        if p.scale_model_factor^2 * prod(p.norm_target_sz) > p.scale_model_max_area
-            p.scale_model_factor = sqrt(p.scale_model_max_area/prod(p.norm_target_sz));
-        end
+        cv::Mat ys(1, cfg.num_scales, CV_32FC2, ysbuf);
+        //delete[] ss;
 
-        scale_model_sz = floor(p.norm_target_sz * p.scale_model_factor);
-        % find maximum and minimum scales
-        min_scale_factor = p.scale_step ^ ceil(log(max(5 ./ bg_area)) / log(p.scale_step));
-        max_scale_factor = p.scale_step ^ floor(log(min([size(im,1) size(im,2)] ./ target_sz)) / log(p.scale_step));
-    end
-#endif
+        cv::dft(ys, ysf, cv::DFT_ROWS);
+        //std::cout << ysf << std::endl;
+
+        float *swbuff = new float[cfg.num_scales];
+
+        if (cfg.num_scales % 2 == 0) {
+            for (int i = 0; i < cfg.num_scales + 1; ++i) {
+                if (i > 0) {
+                    swbuff[i - 1] = 0.5*(1 - cos(_2PI*i / (cfg.num_scales + 1 - 1)));
+                }
+            }
+        } else {
+            for (int i = 0; i < cfg.num_scales; ++i)
+                swbuff[i] = 0.5*(1 - cos(_2PI*i / (cfg.num_scales - 1)));
+        }
+
+        scale_window = cv::Mat(1, cfg.num_scales, CV_32FC1, swbuff);
+
+        float *sfbuf = new float[cfg.num_scales];
+
+        for (int i = 0; i < cfg.num_scales; i++) {
+            sfbuf[i] = pow(cfg.scale_step, (ceil(cfg.num_scales/2.0)  - (i+1)));
+        }
+
+        scale_factors = cv::Mat(1, cfg.num_scales, CV_32FC1, sfbuf);
+        // delete[] sfbuf;
+
+        //std::cout << scale_factors << std::endl;
+
+        //ss = 1:p.num_scales;
+        //scale_factors = p.scale_step.^(ceil(p.num_scales/2) - ss);
+
+        if ((cfg.scale_model_factor*cfg.scale_model_factor) * (norm_target_sz.width*norm_target_sz.height) > cfg.scale_model_max_area) {
+            cfg.scale_model_factor = sqrt(cfg.scale_model_max_area/(norm_target_sz.width*norm_target_sz.height));
+        }
+
+        //std::cout << cfg.scale_model_factor << std::endl;
+
+        scale_model_sz.width = floor(norm_target_sz.width * cfg.scale_model_factor);
+        scale_model_sz.height = floor(norm_target_sz.height * cfg.scale_model_factor);
+        //scale_model_sz = floor(p.norm_target_sz * p.scale_model_factor);
+
+        //std::cout << scale_model_sz << std::endl;
+
+        cv::Size sz = im.size();
+        // find maximum and minimum scales
+        min_scale_factor = pow(cfg.scale_step, ceil(log(std::max(5.0/bg_area.width, 5.0/bg_area.height))/log(cfg.scale_step)));
+        max_scale_factor = pow(cfg.scale_step, floor(log(std::min(sz.width/(float)target_sz.width, sz.height/(float)target_sz.height))/log(cfg.scale_step)));
+        //min_scale_factor = p.scale_step ^ ceil(log(max(5 ./ bg_area)) / log(p.scale_step));
+        //max_scale_factor = p.scale_step ^ floor(log(min([size(im,1) size(im,2)] ./ target_sz)) / log(p.scale_step));
+
+        //std::cout << min_scale_factor << " " << max_scale_factor << std::endl;
+    }
 }
 
 // code from DSST
@@ -545,6 +589,109 @@ void matsplit(const cv::MatND &xt, std::vector<cv::Mat> &xtsplit)
     }
 }
 
+// GET_SUBWINDOW Obtain image sub-window, padding is done by replicating border values.
+//   Returns sub-window of image IM centered at POS ([y, x] coordinates),
+//   with size MODEL_SZ ([height, width]). If any pixels are outside of the image,
+//   they will replicate the values at the borders
+void STAPLE_TRACKER::getSubwindowFloor(const cv::Mat &im, cv::Point_<float> centerCoor, cv::Size model_sz, cv::Size scaled_sz, cv::Mat &output)
+{
+    cv::Size sz = scaled_sz; // scale adaptation
+
+    // make sure the size is not to small
+    sz.width = fmax(sz.width, 2);
+    sz.height = fmax(sz.height, 2);
+
+    cv::Mat subWindow;
+
+    // xs = floor(pos(2)) + (1:patch_sz(2)) - floor(patch_sz(2)/2);
+    // ys = floor(pos(1)) + (1:patch_sz(1)) - floor(patch_sz(1)/2);
+
+    cv::Point lefttop(
+        std::min(im.cols - 1, std::max(-sz.width + 1, int(centerCoor.x + 1) - int(sz.width/2.0))),
+        std::min(im.rows - 1, std::max(-sz.height + 1, int(centerCoor.y + 1) - int(sz.height/2.0)))
+        );
+
+    cv::Point rightbottom(
+        std::max(0, int(lefttop.x + sz.width - 1)),
+        std::max(0, int(lefttop.y + sz.height - 1))
+        );
+
+    cv::Point lefttopLimit(
+        std::max(lefttop.x, 0),
+        std::max(lefttop.y, 0)
+        );
+    cv::Point rightbottomLimit(
+        std::min(rightbottom.x, im.cols - 1),
+        std::min(rightbottom.y, im.rows - 1)
+        );
+
+    rightbottomLimit.x += 1;
+    rightbottomLimit.y += 1;
+    cv::Rect roiRect(lefttopLimit, rightbottomLimit);
+
+    im(roiRect).copyTo(subWindow);
+
+    // imresize(subWindow, output, model_sz, 'bilinear', 'AntiAliasing', false)
+    mexResize(subWindow, output, model_sz, "auto");
+}
+
+// code from DSST
+void STAPLE_TRACKER::getScaleSubwindow(const cv::Mat &im, cv::Point_<float> centerCoor, cv::Mat &output)
+{
+    float *OUTPUT = NULL;
+    int w = 0;
+    int h = 0;
+    int ch = 0;
+    int total = 0;
+
+    for (int s = 0; s < cfg.num_scales; s++) {
+        cv::Size_<float> patch_sz;
+
+        patch_sz.width = floor(base_target_sz.width * scale_factors.at<float>(s));
+        patch_sz.height = floor(base_target_sz.height * scale_factors.at<float>(s));
+
+        cv::Mat im_patch_resized;
+        getSubwindowFloor(im, centerCoor, scale_model_sz, patch_sz, im_patch_resized);
+
+        // extract scale features
+        cv::MatND temp;
+        fhog31(temp, im_patch_resized, cfg.hog_cell_size, 9);
+
+        if (s == 0) {
+            cv::Size sz = temp.size();
+
+            w = sz.width;
+            h = sz.height;
+            ch = temp.channels();
+            total = w*h*ch;
+
+            OUTPUT = new float[cfg.num_scales*total*2](); // xxx
+        }
+
+        cv::Size tempsz = temp.size();
+        int tempw = tempsz.width;
+        int temph = tempsz.height;
+        int tempch = temp.channels();
+
+        int count = 0;
+
+        // window
+        for (int i = 0; i < tempw; i++)
+            for (int j = 0; j < temph; j++)
+                for (int k = 0; k < tempch; k++) {
+                    int off = j*tempw*ch+i*tempch+k;
+
+                    OUTPUT[(count*cfg.num_scales + s)*2 + 0] = ((float *)temp.data)[off] * scale_window.at<float>(s);
+                    OUTPUT[(count*cfg.num_scales + s)*2 + 1] = 0.0;
+                    count++;
+                }
+    }
+
+    output = cv::Mat(total, cfg.num_scales, CV_32FC2, OUTPUT);
+
+    // delete[] OUTPUT
+}
+
 // TRAINING
 void STAPLE_TRACKER::tracker_staple_train(cv::Mat &im, bool first)
 {
@@ -578,79 +725,119 @@ void STAPLE_TRACKER::tracker_staple_train(cv::Mat &im, bool first)
     // new_hf_num = bsxfun(@times, conj(yf), xtf) / prod(p.cf_response_size);
     // new_hf_den = (conj(xtf) .* xtf) / prod(p.cf_response_size);
 
-    std::vector<cv::Mat> new_hf_num;
-    std::vector<cv::Mat> new_hf_den;
+    {
+        std::vector<cv::Mat> new_hf_num;
+        std::vector<cv::Mat> new_hf_den;
 
-    cv::Size sz = xt.size();
-    int w = sz.width;
-    int h = sz.height;
-    float area = cf_response_size.width*cf_response_size.height;
+        cv::Size sz = xt.size();
+        int w = sz.width;
+        int h = sz.height;
+        float area = cf_response_size.width*cf_response_size.height;
 
-    for (int ch = 0; ch < xt.channels(); ch++) {
-        float *DIM = new float[w*h*2];
+        for (int ch = 0; ch < xt.channels(); ch++) {
+            float *DIM = new float[w*h*2];
 
-        for (int i = 0; i < h; i++)
-            for (int j = 0; j < w; j++) {
-                cv::Vec2f pXTF = xtf[ch].at<cv::Vec2f>(i,j);
-                cv::Vec2f pYF = yf.at<cv::Vec2f>(i,j);
+            for (int i = 0; i < h; i++)
+                for (int j = 0; j < w; j++) {
+                    cv::Vec2f pXTF = xtf[ch].at<cv::Vec2f>(i,j);
+                    cv::Vec2f pYF = yf.at<cv::Vec2f>(i,j);
 
-                DIM[i*w*2+j*2+0] = (pYF[1]*pXTF[1] + pYF[0]*pXTF[0]) / area;
-                DIM[i*w*2+j*2+1] = (pYF[0]*pXTF[1] - pYF[1]*pXTF[0]) / area;
-            }
+                    DIM[i*w*2+j*2+0] = (pYF[1]*pXTF[1] + pYF[0]*pXTF[0]) / area;
+                    DIM[i*w*2+j*2+1] = (pYF[0]*pXTF[1] - pYF[1]*pXTF[0]) / area;
+                }
 
-        cv::Mat dim(h, w, CV_32FC2, DIM);
+            cv::Mat dim(h, w, CV_32FC2, DIM);
 
-        new_hf_num.push_back(dim);
-    }
-
-    for (int ch = 0; ch < xt.channels(); ch++) {
-        float *DIM1 = new float[w*h];
-
-        for (int i = 0; i < h; i++)
-            for (int j = 0; j < w; j++) {
-                cv::Vec2f pXTF = xtf[ch].at<cv::Vec2f>(i,j);
-
-                DIM1[i*w+j] = (pXTF[0]*pXTF[0] + pXTF[1]*pXTF[1]) / area;
-            }
-
-        cv::Mat dim(h, w, CV_32FC1, DIM1);
-
-        new_hf_den.push_back(dim);
-    }
-
-    if (first) {
-        // first frame, train with a single image
-        hf_den.assign(new_hf_den.begin(), new_hf_den.end());
-        hf_num.assign(new_hf_num.begin(), new_hf_num.end());
-    } else {
-        // subsequent frames, update the model by linear interpolation
-        for (int ch =  0; ch < xt.channels(); ch++) {
-            hf_den[ch] = (1 - cfg.learning_rate_cf) * hf_den[ch] + cfg.learning_rate_cf * new_hf_den[ch];
-            hf_num[ch] = (1 - cfg.learning_rate_cf) * hf_num[ch] + cfg.learning_rate_cf * new_hf_num[ch];
+            new_hf_num.push_back(dim);
         }
 
-        updateHistModel(false, im_patch_bg, cfg.learning_rate_cf);
+        for (int ch = 0; ch < xt.channels(); ch++) {
+            float *DIM1 = new float[w*h];
 
-        // BG/FG MODEL UPDATE
-        // patch of the target + padding
-        // [bg_hist, fg_hist] = updateHistModel(new_pwp_model, im_patch_bg, bg_area, fg_area, target_sz, p.norm_bg_area, p.n_bins, p.grayscale_sequence, bg_hist, fg_hist, p.learning_rate_pwp);
+            for (int i = 0; i < h; i++)
+                for (int j = 0; j < w; j++) {
+                    cv::Vec2f pXTF = xtf[ch].at<cv::Vec2f>(i,j);
+
+                    DIM1[i*w+j] = (pXTF[0]*pXTF[0] + pXTF[1]*pXTF[1]) / area;
+                }
+
+            cv::Mat dim(h, w, CV_32FC1, DIM1);
+
+            new_hf_den.push_back(dim);
+        }
+
+        if (first) {
+            // first frame, train with a single image
+            hf_den.assign(new_hf_den.begin(), new_hf_den.end());
+            hf_num.assign(new_hf_num.begin(), new_hf_num.end());
+        } else {
+            // subsequent frames, update the model by linear interpolation
+            for (int ch =  0; ch < xt.channels(); ch++) {
+                hf_den[ch] = (1 - cfg.learning_rate_cf) * hf_den[ch] + cfg.learning_rate_cf * new_hf_den[ch];
+                hf_num[ch] = (1 - cfg.learning_rate_cf) * hf_num[ch] + cfg.learning_rate_cf * new_hf_num[ch];
+            }
+
+            updateHistModel(false, im_patch_bg, cfg.learning_rate_cf);
+
+            // BG/FG MODEL UPDATE
+            // patch of the target + padding
+            // [bg_hist, fg_hist] = updateHistModel(new_pwp_model, im_patch_bg, bg_area, fg_area, target_sz, p.norm_bg_area, p.n_bins, p.grayscale_sequence, bg_hist, fg_hist, p.learning_rate_pwp);
+        }
     }
-#if 0
-    %% SCALE UPDATE
-    if p.scale_adaptation
-        im_patch_scale = getScaleSubwindow(im, pos, base_target_sz, scale_factor*scale_factors, scale_window, scale_model_sz, p.hog_scale_cell_size);
-        xsf = fft(im_patch_scale,[],2);
-        new_sf_num = bsxfun(@times, ysf, conj(xsf));
-        new_sf_den = sum(xsf .* conj(xsf), 1);
-        if frame == 1,
-            sf_den = new_sf_den;
-            sf_num = new_sf_num;
-        else
-            sf_den = (1 - p.learning_rate_scale) * sf_den + p.learning_rate_scale * new_sf_den;
-            sf_num = (1 - p.learning_rate_scale) * sf_num + p.learning_rate_scale * new_sf_num;
-        end
-    end
-#endif
+
+    // SCALE UPDATE
+    if (cfg.scale_adaptation) {
+        cv::Mat im_patch_scale;
+
+        getScaleSubwindow(im, pos, im_patch_scale);
+
+        cv::Mat xsf;
+        cv::dft(im_patch_scale, xsf, cv::DFT_ROWS);
+
+        // new_sf_num = bsxfun(@times, ysf, conj(xsf));
+        // new_sf_den = sum(xsf .* conj(xsf), 1);
+
+        cv::Mat new_sf_num;
+        cv::Mat new_sf_den;
+
+        cv::Size sz = xsf.size();
+        int w = sz.width;
+        int h = sz.height;
+
+        float *NEW_SF_NUM = new float[w*h*2];
+
+        for (int i = 0; i < h; i++) // xxx
+            for (int j = 0; j < w; j++) {
+                cv::Vec2f pXSF = xsf.at<cv::Vec2f>(i,j);
+                cv::Vec2f pYSF = ysf.at<cv::Vec2f>(j);
+
+                NEW_SF_NUM[i*w*2+j*2+0] = (pYSF[1]*pXSF[1] + pYSF[0]*pXSF[0]);
+                NEW_SF_NUM[i*w*2+j*2+1] = (pYSF[1]*pXSF[0] - pYSF[0]*pXSF[1]);
+            }
+
+        new_sf_num = cv::Mat(h, w, CV_32FC2, NEW_SF_NUM);
+
+        float *NEW_SF_DEN = new float[w]();
+
+        for (int i = 0; i < h; i++)
+            for (int j = 0; j < w; j++) {
+                cv::Vec2f pXSF = xsf.at<cv::Vec2f>(i,j);
+
+                NEW_SF_DEN[j] += (pXSF[0]*pXSF[0] + pXSF[1]*pXSF[1]);
+            }
+
+        new_sf_den = cv::Mat(1, w, CV_32FC1, NEW_SF_DEN);
+
+        if (first) {
+            // first frame, train with a single image
+            new_sf_den.copyTo(sf_den);
+            new_sf_num.copyTo(sf_num);
+        } else {
+            sf_den = (1 - cfg.learning_rate_scale) * sf_den + cfg.learning_rate_scale * new_sf_den;
+            sf_num = (1 - cfg.learning_rate_scale) * sf_num + cfg.learning_rate_scale * new_sf_num;
+        }
+    }
+
     // update bbox position
     if (first) {
         rect_position.x = pos.x - target_sz.width/2;
@@ -925,6 +1112,7 @@ cv::Rect STAPLE_TRACKER::tracker_staple_update(cv::Mat &im)
 
         delete[] DIM1;
     }
+
     float *RESPONSE_CF = new float[w*h*2];
 
     for (int i = 0; i < w; i++)
@@ -1015,44 +1203,84 @@ cv::Rect STAPLE_TRACKER::tracker_staple_update(cv::Mat &im)
     // pos = pos + ([row, col] - center) / area_resize_factor;
     // rect_position = [pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
 
-#if 0
-    %% SCALE SPACE SEARCH
-    if p.scale_adaptation
-        im_patch_scale = getScaleSubwindow(im, pos, base_target_sz, scale_factor * scale_factors, scale_window, scale_model_sz, p.hog_scale_cell_size);
-        xsf = fft(im_patch_scale,[],2);
-        scale_response = real(ifft(sum(sf_num .* xsf, 1) ./ (sf_den + p.lambda) ));
-        recovered_scale = ind2sub(size(scale_response),find(scale_response == max(scale_response(:)), 1));
-        %set the scale
-        scale_factor = scale_factor * scale_factors(recovered_scale);
+    // SCALE SPACE SEARCH
+    if (cfg.scale_adaptation) {
+        cv::Mat im_patch_scale;
 
-        if scale_factor < min_scale_factor
+        getScaleSubwindow(im, pos, im_patch_scale);
+
+        cv::Mat xsf;
+        cv::dft(im_patch_scale, xsf, cv::DFT_ROWS);
+
+        // im_patch_scale = getScaleSubwindow(im, pos, base_target_sz, scale_factor * scale_factors, scale_window, scale_model_sz, p.hog_scale_cell_size);
+        // xsf = fft(im_patch_scale,[],2);
+
+        cv::Size sz = xsf.size();
+        int w = sz.width;
+        int h = sz.height;
+        float *SCALE_RESPONSEF = new float[w*2]();
+
+        for (int i = 0; i < w; i++) {
+            for (int j = 0; j < h; j++) {
+                cv::Vec2f pXSF = xsf.at<cv::Vec2f>(j,i);
+                cv::Vec2f pXSFNUM = sf_num.at<cv::Vec2f>(j,i);
+
+                SCALE_RESPONSEF[i*2] += (pXSFNUM[0]*pXSF[0] - pXSFNUM[1]*pXSF[1]) / (sf_den.at<float>(i) + cfg.lambda);
+                SCALE_RESPONSEF[i*2 + 1] += (pXSFNUM[0]*pXSF[1] + pXSFNUM[1]*pXSF[0]) / (sf_den.at<float>(i) + cfg.lambda);
+            }
+        }
+
+        cv::Mat scale_responsef(1, w, CV_32FC2, SCALE_RESPONSEF);
+        cv::Mat scale_responsefi;
+
+        cv::dft(scale_responsef, scale_responsefi, cv::DFT_SCALE|cv::DFT_INVERSE);
+        cv::Mat scale_response = ensure_real(scale_responsefi);
+
+        //scale_response = real(ifft(sum(sf_num .* xsf, 1) ./ (sf_den + p.lambda) ));
+
+        double minVal, maxVal;
+        cv::Point minLoc, maxLoc;
+
+        cv::minMaxLoc(scale_response, &minVal, &maxVal, &minLoc, &maxLoc);
+
+        //recovered_scale = ind2sub(size(scale_response),find(scale_response == max(scale_response(:)), 1));
+
+        int recovered_scale =  maxLoc.x;
+
+        // set the scale
+        scale_factor = scale_factor * scale_factors.at<float>(recovered_scale);
+
+        if (scale_factor < min_scale_factor) {
             scale_factor = min_scale_factor;
-        elseif scale_factor > max_scale_factor
+        } else if (scale_factor > max_scale_factor) {
             scale_factor = max_scale_factor;
-        end
-        % use new scale to update bboxes for target, filter, bg and fg models
-        target_sz = round(base_target_sz * scale_factor);
-        avg_dim = sum(target_sz)/2;
-        bg_area = round(target_sz + avg_dim);
-        if(bg_area(2)>size(im,2)),  bg_area(2)=size(im,2)-1;    end
-        if(bg_area(1)>size(im,1)),  bg_area(1)=size(im,1)-1;    end
+        }
 
-        bg_area = bg_area - mod(bg_area - target_sz, 2);
-        fg_area = round(target_sz - avg_dim * p.inner_padding);
-        fg_area = fg_area + mod(bg_area - fg_area, 2);
-        % Compute the rectangle with (or close to) params.fixed_area and
-        % same aspect ratio as the target bboxgetScaleSubwindow
-        area_resize_factor = sqrt(p.fixed_area/prod(bg_area));
-    end
+        // use new scale to update bboxes for target, filter, bg and fg models
+        target_sz.width = round(base_target_sz.width * scale_factor);
+        target_sz.height = round(base_target_sz.height * scale_factor);
 
-    if p.visualization_dbg==1
-        mySubplot(2,1,5,1,im_patch_cf,'FG+BG','gray');
-        mySubplot(2,1,5,2,likelihood_map,'obj.likelihood','parula');
-        mySubplot(2,1,5,3,response_cf,'CF response','parula');
-        mySubplot(2,1,5,4,response_pwp,'center likelihood','parula');
-        mySubplot(2,1,5,5,response,'merged response','parula');
-        drawnow
-    end
-#endif
+        float avg_dim = (target_sz.width + target_sz.height)/2.0;
+
+        bg_area.width= round(target_sz.width + avg_dim);
+        bg_area.height = round(target_sz.height + avg_dim);
+
+        (bg_area.width > im.cols) && (bg_area.width = im.cols - 1);
+        (bg_area.height > im.rows) && (bg_area.height = im.rows - 1);
+
+        bg_area.width = bg_area.width - (bg_area.width - target_sz.width) % 2;
+        bg_area.height = bg_area.height - (bg_area.height - target_sz.height) % 2;
+
+        fg_area.width = round(target_sz.width - avg_dim * cfg.inner_padding);
+        fg_area.height = round(target_sz.height - avg_dim * cfg.inner_padding);
+
+        fg_area.width = fg_area.width + int(bg_area.width - fg_area.width) % 2;
+        fg_area.height = fg_area.height + int(bg_area.height - fg_area.height) % 2;
+
+        // Compute the rectangle with (or close to) params.fixed_area and
+        // same aspect ratio as the target bboxgetScaleSubwindow
+        area_resize_factor = sqrt(cfg.fixed_area / (float)(bg_area.width * bg_area.height));
+    }
+
     return location;
 }
