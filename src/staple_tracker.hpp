@@ -52,7 +52,7 @@ struct staple_cfg
 class STAPLE_TRACKER
 {
 public:
-    STAPLE_TRACKER(){ cfg = default_parameters_staple(cfg); };
+    STAPLE_TRACKER(){ cfg = default_parameters_staple(cfg); frameno = 0; };
     ~STAPLE_TRACKER(){}
 
     void mexResize(const cv::Mat &im, cv::Mat &output, cv::Size newsz, const char *method);
@@ -116,6 +116,8 @@ private:
     cv::Mat ysf;
     cv::Mat sf_den;
     cv::Mat sf_num;
+
+    int frameno;
 };
 
 #endif

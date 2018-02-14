@@ -647,8 +647,8 @@ void STAPLE_TRACKER::getScaleSubwindow(const cv::Mat &im, cv::Point_<float> cent
     for (int s = 0; s < cfg.num_scales; s++) {
         cv::Size_<float> patch_sz;
 
-        patch_sz.width = floor(base_target_sz.width * scale_factors.at<float>(s));
-        patch_sz.height = floor(base_target_sz.height * scale_factors.at<float>(s));
+        patch_sz.width = floor(base_target_sz.width * scale_factor * scale_factors.at<float>(s));
+        patch_sz.height = floor(base_target_sz.height * scale_factor * scale_factors.at<float>(s));
 
         cv::Mat im_patch_resized;
         getSubwindowFloor(im, centerCoor, scale_model_sz, patch_sz, im_patch_resized);
@@ -845,6 +845,8 @@ void STAPLE_TRACKER::tracker_staple_train(cv::Mat &im, bool first)
         rect_position.width = target_sz.width;
         rect_position.height = target_sz.height;
     }
+
+    frameno += 1;
 }
 
 // xxx: improve later
@@ -1197,7 +1199,7 @@ cv::Rect STAPLE_TRACKER::tracker_staple_update(cv::Mat &im)
     location.width = target_sz.width;
     location.height = target_sz.height;
 
-    std::cout << location << std::endl;
+    //std::cout << location << std::endl;
 
     // center = (1+p.norm_delta_area) / 2;
     // pos = pos + ([row, col] - center) / area_resize_factor;
@@ -1231,10 +1233,9 @@ cv::Rect STAPLE_TRACKER::tracker_staple_update(cv::Mat &im)
         }
 
         cv::Mat scale_responsef(1, w, CV_32FC2, SCALE_RESPONSEF);
-        cv::Mat scale_responsefi;
+        cv::Mat scale_response;
 
-        cv::dft(scale_responsef, scale_responsefi, cv::DFT_SCALE|cv::DFT_INVERSE);
-        cv::Mat scale_response = ensure_real(scale_responsefi);
+        cv::dft(scale_responsef, scale_response, cv::DFT_SCALE|cv::DFT_INVERSE|cv::DFT_REAL_OUTPUT);
 
         //scale_response = real(ifft(sum(sf_num .* xsf, 1) ./ (sf_den + p.lambda) ));
 
