@@ -255,9 +255,9 @@ void STAPLE_TRACKER::updateHistModel(bool new_model, cv::Mat &patch, double lear
     int dims = 3;
     const int sizes[] = { cfg.n_bins, cfg.n_bins, cfg.n_bins };
     const int channels[] = { 0, 1, 2 };
-    float bRange[] = { 0, 255 };
-    float gRange[] = { 0, 255 };
-    float rRange[] = { 0, 255 };
+    float bRange[] = { 0, 256 };
+    float gRange[] = { 0, 256 };
+    float rRange[] = { 0, 256 };
     const float *ranges[] = { bRange, gRange, rRange };
 
     if (cfg.grayscale_sequence) {
@@ -777,7 +777,7 @@ void STAPLE_TRACKER::tracker_staple_train(cv::Mat &im, bool first)
                 hf_num[ch] = (1 - cfg.learning_rate_cf) * hf_num[ch] + cfg.learning_rate_cf * new_hf_num[ch];
             }
 
-            updateHistModel(false, im_patch_bg, cfg.learning_rate_cf);
+            updateHistModel(false, im_patch_bg, cfg.learning_rate_pwp);
 
             // BG/FG MODEL UPDATE
             // patch of the target + padding
