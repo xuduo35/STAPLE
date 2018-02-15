@@ -15,6 +15,8 @@
 #include "staple_tracker.hpp"
 #include <iomanip>
 
+// mexResize got different results using different OpenCV, it's not trustable
+// I found this bug by running vot2015/tunnel, it happened when frameno+1==22 after frameno+1==21
 void STAPLE_TRACKER::mexResize(const cv::Mat &im, cv::Mat &output, cv::Size newsz, const char *method) {
     int interpolation = cv::INTER_LINEAR;
 
@@ -25,7 +27,7 @@ void STAPLE_TRACKER::mexResize(const cv::Mat &im, cv::Mat &output, cv::Size news
     } else if (!strcmp(method, "linear")){
       interpolation = cv::INTER_LINEAR;
     } else if (!strcmp(method, "auto")){
-      if(newsz.width > sz.height){
+      if(newsz.width > sz.width){ // xxx
         interpolation = cv::INTER_LINEAR;
       }else{
         interpolation = cv::INTER_AREA;
