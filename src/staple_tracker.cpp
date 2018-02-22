@@ -392,7 +392,7 @@ void STAPLE_TRACKER::tracker_staple_initialize(const cv::Mat &im, cv::Rect_<floa
     }
 
     // xxx: only support 3 channels, TODO: fix updateHistModel
-    assert(!cfg.grayscale_sequence);
+    //assert(!cfg.grayscale_sequence);
 
     // double cx = region.x + region.width / 2.0;
     // double cy = region.y + region.height / 2.0;
@@ -955,27 +955,47 @@ void STAPLE_TRACKER::getColourMap(const cv::Mat &patch, cv::Mat& output)
 
     for (int i = 0; i < w; i++)
         for (int j = 0; j < h; j++) {
-            cv::Vec3b p = patch.at<cv::Vec3b>(j,i);
+            if (cfg.grayscale_sequence) {
+                cv::Vec3b p = patch.at<cv::Vec3b>(j,i);
 
-            int b1 = floor(p[0] / bin_width);
-            int b2 = floor(p[1] / bin_width);
-            int b3 = floor(p[2] / bin_width);
+                int b1 = floor(p[0] / bin_width);
+                int b2 = floor(p[1] / bin_width);
+                int b3 = floor(p[2] / bin_width);
 
-            float* histd;
+                float* histd;
 
-            histd = (float*)bg_hist.data;
-            probg = histd[b1*cfg.n_bins*cfg.n_bins + b2*cfg.n_bins + b3];
+                histd = (float*)bg_hist.data;
+                probg = histd[b1*cfg.n_bins*cfg.n_bins + b2*cfg.n_bins + b3];
 
-            histd = (float*)fg_hist.data;
-            profg = histd[b1*cfg.n_bins*cfg.n_bins + b2*cfg.n_bins + b3];
+                histd = (float*)fg_hist.data;
+                profg = histd[b1*cfg.n_bins*cfg.n_bins + b2*cfg.n_bins + b3];
 
-            // xxx
-            P_O[j*w+i] = profg / (profg + probg);
+                // xxx
+                P_O[j*w+i] = profg / (profg + probg);
 
-            isnan(P_O[j*w+i]) && (P_O[j*w+i] = 0.0);
+                isnan(P_O[j*w+i]) && (P_O[j*w+i] = 0.0);
 
-            // (TODO) in theory it should be at 0.5 (unseen colors shoud have max entropy)
-            //likelihood_map(isnan(likelihood_map)) = 0;
+                // (TODO) in theory it should be at 0.5 (unseen colors shoud have max entropy)
+                //likelihood_map(isnan(likelihood_map)) = 0;
+            } else {
+                int b = patch.at<uchar>(j,i);
+
+                float* histd;
+
+                histd = (float*)bg_hist.data;
+                probg = histd[b];
+
+                histd = (float*)fg_hist.data;
+                profg = histd[b];
+
+                // xxx
+                P_O[j*w+i] = profg / (profg + probg);
+
+                isnan(P_O[j*w+i]) && (P_O[j*w+i] = 0.0);
+
+                // (TODO) in theory it should be at 0.5 (unseen colors shoud have max entropy)
+                //likelihood_map(isnan(likelihood_map)) = 0;
+            }
         }
 
     // to which bin each pixel (for all d channels) belongs to
