@@ -302,7 +302,8 @@ void hogChannels( float *H, const float *R, const float *N,
 void hog( float *M, float *O, float *H, int h, int w, int binSize,
   int nOrients, int softBin, bool full, float clip )
 {
-  float *N, *R; const int hb=h/binSize, wb=w/binSize, nb=hb*wb;
+  //float *N, *R; const int hb=h/binSize, wb=w/binSize, nb=hb*wb;
+  float *N, *R; const int hb=h/binSize, wb=w/binSize;
   // compute unnormalized gradient histograms
   R = (float*) wrCalloc(wb*hb*nOrients,sizeof(float));
   gradHist( M, O, R, h, w, binSize, nOrients, softBin, full );
@@ -494,7 +495,6 @@ void fhog(cv::MatND &fhog_feature, const cv::Mat& input, int binSize, int nOrien
         }
     }
 
-    float temp;
     float *M = new float[HEIGHT*WIDTH], *O = new float[HEIGHT*WIDTH];
     gradMag(I, M, O, HEIGHT, WIDTH, DEPTH, true);
 
@@ -508,7 +508,9 @@ void fhog(cv::MatND &fhog_feature, const cv::Mat& input, int binSize, int nOrien
                 //H[i*h*d+j*d+k] = HH[k*w*h+i*h+j]; // ->hwd
                 H[j*w*d+i*d+k] = HH[k*w*h+i*h+j]; // ->whd
 
-    fhog_feature = cv::MatND(h,w,CV_32FC(32),H);
+    fhog_feature = cv::MatND(h,w,CV_32FC(32),H).clone();
+
+    delete[] H;
 
     delete[] M; delete[] O;
     delete[] II;delete[] I;delete[] HH;
@@ -545,7 +547,6 @@ void fhog28(cv::MatND &fhog_feature, const cv::Mat& input, int binSize, int nOri
         }
     }
 
-    float temp;
     float *M = new float[HEIGHT*WIDTH], *O = new float[HEIGHT*WIDTH];
     gradMag(I, M, O, HEIGHT, WIDTH, DEPTH, true);
 
@@ -572,7 +573,9 @@ void fhog28(cv::MatND &fhog_feature, const cv::Mat& input, int binSize, int nOri
             }
         }
 
-    fhog_feature = cv::MatND(h,w,CV_32FC(CHANNELS),H);
+    fhog_feature = cv::MatND(h,w,CV_32FC(CHANNELS),H).clone();
+
+    delete[] H;
 
     delete[] M; delete[] O;
     delete[] II;delete[] I;delete[] HH;
@@ -609,7 +612,6 @@ void fhog31(cv::MatND &fhog_feature, const cv::Mat& input, int binSize, int nOri
         }
     }
 
-    float temp;
     float *M = new float[HEIGHT*WIDTH], *O = new float[HEIGHT*WIDTH];
     gradMag(I, M, O, HEIGHT, WIDTH, DEPTH, true);
 
@@ -634,7 +636,9 @@ void fhog31(cv::MatND &fhog_feature, const cv::Mat& input, int binSize, int nOri
             }
         }
 
-    fhog_feature = cv::MatND(h,w,CV_32FC(CHANNELS),H);
+    fhog_feature = cv::MatND(h,w,CV_32FC(CHANNELS),H).clone();
+
+    delete[] H;
 
     delete[] M; delete[] O;
     delete[] II;delete[] I;delete[] HH;

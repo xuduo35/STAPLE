@@ -56,13 +56,13 @@ public:
     ~STAPLE_TRACKER(){}
 
     void mexResize(const cv::Mat &im, cv::Mat &output, cv::Size newsz, const char *method);
-    void tracker_staple_train(cv::Mat &im, bool first);
-    void tracker_staple_initialize(cv::Mat &im, cv::Rect_<float> region);
-    cv::Rect tracker_staple_update(cv::Mat &im);
+    void tracker_staple_train(const cv::Mat &im, bool first);
+    void tracker_staple_initialize(const cv::Mat &im, cv::Rect_<float> region);
+    cv::Rect tracker_staple_update(const cv::Mat &im);
 
 protected:
     staple_cfg default_parameters_staple(staple_cfg cfg);
-    void initializeAllAreas(cv::Mat &im);
+    void initializeAllAreas(const cv::Mat &im);
 
     void getSubwindow(const cv::Mat &im, cv::Point_<float> centerCoor, cv::Size model_sz, cv::Size scaled_sz, cv::Mat &output);
     void getSubwindowFloor(const cv::Mat &im, cv::Point_<float> centerCoor, cv::Size model_sz, cv::Size scaled_sz, cv::Mat &output);
