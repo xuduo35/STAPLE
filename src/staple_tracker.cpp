@@ -955,7 +955,7 @@ void STAPLE_TRACKER::getColourMap(const cv::Mat &patch, cv::Mat& output)
 
     for (int i = 0; i < w; i++)
         for (int j = 0; j < h; j++) {
-            if (cfg.grayscale_sequence) {
+            if (!cfg.grayscale_sequence) {
                 cv::Vec3b p = patch.at<cv::Vec3b>(j,i);
 
                 int b1 = floor(p[0] / bin_width);
