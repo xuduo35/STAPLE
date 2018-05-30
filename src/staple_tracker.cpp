@@ -161,12 +161,12 @@ void STAPLE_TRACKER::getSubwindow(const cv::Mat &im, cv::Point_<float> centerCoo
 
     im(roiRect).copyTo(subWindow);
 	
-	int top = lefttopLimit.y - lefttop.y;
-	int bottom = rightbottom.y - rightbottomLimit.y + 1;
-	int left = lefttopLimit.x - lefttop.x;
-	int right = rightbottom.x - rightbottomLimit.x + 1;
-
-	cv::copyMakeBorder(subWindow, subWindow, top, bottom, left, right, cv::BORDER_REPLICATE);
+    int top = lefttopLimit.y - lefttop.y;
+    int bottom = rightbottom.y - rightbottomLimit.y + 1;
+    int left = lefttopLimit.x - lefttop.x;
+    int right = rightbottom.x - rightbottomLimit.x + 1;
+	
+    cv::copyMakeBorder(subWindow, subWindow, top, bottom, left, right, cv::BORDER_REPLICATE);
 
     // imresize(subWindow, output, model_sz, 'bilinear', 'AntiAliasing', false)
     mexResize(subWindow, output, model_sz, "auto");
