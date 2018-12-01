@@ -547,7 +547,7 @@ void STAPLE_TRACKER::getFeatureMap(cv::Mat &im_patch, const char *feature_type, 
     cv::Mat grayimg;
 
     if (new_im_patch.channels() > 1) {
-        cv::cvtColor(new_im_patch, grayimg, CV_BGR2GRAY);
+        cv::cvtColor(new_im_patch, grayimg, cv::COLOR_BGR2GRAY);
     } else {
         grayimg = new_im_patch;
     }
