@@ -12,9 +12,9 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
-#define _PI 3.141592653589793
-#define _2PI 6.283185307179586
-
+///
+/// \brief The staple_cfg struct
+///
 struct staple_cfg
 {
     bool grayscale_sequence = false;    // suppose that sequence is colour
@@ -49,10 +49,17 @@ struct staple_cfg
     cv::Size target_sz;
 };
 
+///
+/// \brief The STAPLE_TRACKER class
+///
 class STAPLE_TRACKER
 {
 public:
-    STAPLE_TRACKER(){ cfg = default_parameters_staple(cfg); frameno = 0; };
+    STAPLE_TRACKER()
+    {
+        cfg = default_parameters_staple(cfg);
+        frameno = 0;
+    }
     ~STAPLE_TRACKER(){}
 
     void mexResize(const cv::Mat &im, cv::Mat &output, cv::Size newsz, const char *method);
@@ -117,7 +124,7 @@ private:
     cv::Mat sf_den;
     cv::Mat sf_num;
 
-    int frameno;
+    int frameno = 0;
 };
 
 #endif
